@@ -1,0 +1,777 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GEO · 生成式引擎优化 — 蒋礼</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@300;400;600;700&family=Noto+Serif+JP:wght@300;400;600;700&family=Noto+Serif+KR:wght@300;400;600;700&family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --ink:#090d15;--ink-2:#111620;--ink-3:#181e2c;
+  --blue:#4d8eff;--blue-lo:rgba(77,142,255,.13);--blue-border:rgba(77,142,255,.25);
+  --gold:#e9ba4c;--gold-lo:rgba(233,186,76,.11);--gold-border:rgba(233,186,76,.25);
+  --teal:#2dd4bf;--teal-lo:rgba(45,212,191,.1);
+  --t1:#eef1fa;--t2:#8e97b4;--t3:#4a5270;--t4:#282f45;
+  --border:rgba(255,255,255,.06);--border2:rgba(255,255,255,.11);
+  --serif:'Noto Serif SC',serif;--sans:'Inter',sans-serif;--mono:'JetBrains Mono',monospace;
+}
+body.lang-ja{--serif:'Noto Serif JP',serif}
+body.lang-ko{--serif:'Noto Serif KR',serif}
+body.lang-en{--serif:'Georgia','Times New Roman',serif}
+html{scroll-behavior:smooth}
+body{background:var(--ink);color:var(--t1);font-family:var(--sans);font-size:16px;line-height:1.7;-webkit-font-smoothing:antialiased;overflow-x:hidden}
+
+/* i18n */
+.zh,.en,.ja,.ko{display:none}
+body.lang-zh .zh{display:revert}
+body.lang-en .en{display:revert}
+body.lang-ja .ja{display:revert}
+body.lang-ko .ko{display:revert}
+
+/* grid bg */
+.grid-bg{position:fixed;inset:0;pointer-events:none;z-index:0;
+  background-image:linear-gradient(rgba(77,142,255,.035) 1px,transparent 1px),linear-gradient(90deg,rgba(77,142,255,.035) 1px,transparent 1px);
+  background-size:52px 52px}
+
+/* lang bar / nav */
+.lang-bar{position:fixed;top:0;left:0;right:0;z-index:200;display:flex;align-items:center;justify-content:space-between;padding:0 5vw;height:60px;background:rgba(9,13,21,.92);backdrop-filter:blur(20px);border-bottom:1px solid var(--border)}
+.nav-brand{font-family:var(--mono);font-size:13px;color:var(--blue);letter-spacing:.06em}
+.nav-links{display:flex;gap:22px}
+.nav-links a{font-size:11px;color:var(--t3);text-decoration:none;transition:color .2s;letter-spacing:.03em}
+.nav-links a:hover{color:var(--t1)}
+.lang-btns{display:flex;gap:5px;flex-shrink:0}
+.lang-btn{font-family:var(--mono);font-size:11px;padding:4px 12px;border-radius:6px;border:1px solid var(--border2);background:transparent;color:var(--t3);cursor:pointer;transition:all .2s;letter-spacing:.05em}
+.lang-btn:hover{color:var(--t1);border-color:var(--blue);background:var(--blue-lo)}
+.lang-btn.active{color:var(--blue);border-color:var(--blue);background:var(--blue-lo)}
+
+/* hero */
+.hero{position:relative;z-index:1;min-height:100vh;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;padding:120px 5vw 80px;overflow:hidden}
+.glow{position:absolute;border-radius:50%;filter:blur(130px);pointer-events:none}
+.glow-b{width:700px;height:700px;background:rgba(77,142,255,.09);top:-160px;left:-200px}
+.glow-g{width:600px;height:600px;background:rgba(233,186,76,.07);bottom:-100px;right:-180px}
+.eyebrow{display:inline-flex;align-items:center;gap:8px;font-family:var(--mono);font-size:11px;color:var(--blue);letter-spacing:.14em;text-transform:uppercase;margin-bottom:32px;padding:5px 16px;border:1px solid var(--blue-border);border-radius:100px;background:var(--blue-lo)}
+.eyebrow-dot{width:6px;height:6px;border-radius:50%;background:var(--blue);animation:pulse 2s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.4;transform:scale(.75)}}
+.hero-title{font-family:var(--serif);font-size:clamp(56px,9vw,104px);font-weight:700;line-height:1.02;letter-spacing:-.03em;margin-bottom:10px}
+.title-geo{display:block;background:linear-gradient(130deg,#fff 0%,#c4d4ff 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.title-sub{display:block;font-size:clamp(18px,2.8vw,30px);font-weight:300;color:var(--t2);margin-top:14px;letter-spacing:.06em;font-family:var(--serif)}
+.hero-desc{max-width:580px;font-size:15px;color:var(--t2);line-height:1.9;margin:38px auto 0}
+
+/* chart */
+.chart-wrap{width:100%;max-width:700px;margin:56px auto 0}
+.chart-svg{width:100%;overflow:visible}
+.path-linear{fill:none;stroke:var(--blue);stroke-width:2.5;stroke-dasharray:620;stroke-dashoffset:620;animation:draw 2.2s .6s cubic-bezier(.4,0,.2,1) forwards}
+.path-expo{fill:none;stroke:var(--gold);stroke-width:2.5;stroke-dasharray:720;stroke-dashoffset:720;animation:draw 2.2s 1.1s cubic-bezier(.4,0,.2,1) forwards}
+@keyframes draw{to{stroke-dashoffset:0}}
+.area-b{fill:url(#gb);opacity:0;animation:fin 1s 2.5s forwards}
+.area-g{fill:url(#gg);opacity:0;animation:fin 1s 2.7s forwards}
+@keyframes fin{to{opacity:1}}
+.chart-labels{display:flex;justify-content:space-between;margin-top:12px;padding:0 6px}
+.clabel{display:flex;align-items:center;gap:8px;font-family:var(--mono);font-size:11px;color:var(--t3)}
+.cdot{width:8px;height:8px;border-radius:50%}
+
+/* stat strip */
+.stat-strip{position:relative;z-index:1;display:grid;grid-template-columns:repeat(3,1fr);border-top:1px solid var(--border);border-bottom:1px solid var(--border);background:var(--ink-2)}
+.stat-cell{padding:32px 24px;border-right:1px solid var(--border);text-align:center}
+.stat-cell:last-child{border-right:none}
+.stat-num{font-family:var(--serif);font-size:clamp(36px,5vw,52px);font-weight:700;line-height:1;background:linear-gradient(130deg,var(--gold),#f5c842);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;margin-bottom:8px}
+.stat-label{font-size:13px;color:var(--t2);line-height:1.55}
+.stat-src{font-family:var(--mono);font-size:10px;color:var(--t3);margin-top:6px;letter-spacing:.05em}
+
+/* author */
+.author-band{position:relative;z-index:1;padding:64px 5vw;background:var(--ink-2);border-top:1px solid var(--border);border-bottom:1px solid var(--border)}
+.author-inner{max-width:900px;margin:0 auto;display:flex;gap:48px;align-items:center}
+.avatar{flex-shrink:0;width:92px;height:92px;border-radius:50%;background:linear-gradient(135deg,var(--blue-lo),var(--gold-lo));border:1px solid var(--border2);display:flex;align-items:center;justify-content:center;font-family:'Noto Serif SC',serif;font-size:34px;font-weight:700;color:var(--t1)}
+.author-name{font-family:var(--serif);font-size:30px;font-weight:600;margin-bottom:4px}
+.author-role{font-family:var(--mono);font-size:11px;color:var(--blue);letter-spacing:.08em;margin-bottom:14px}
+.author-bio{font-size:14px;color:var(--t2);line-height:1.9;max-width:580px}
+
+/* section */
+section{position:relative;z-index:1;padding:96px 5vw}
+.si{max-width:1140px;margin:0 auto}
+.s-eye{font-family:var(--mono);font-size:11px;color:var(--t3);letter-spacing:.14em;text-transform:uppercase;margin-bottom:14px}
+.s-title{font-family:var(--serif);font-size:clamp(28px,3.8vw,44px);font-weight:600;line-height:1.2;margin-bottom:18px}
+.s-lead{font-size:15px;color:var(--t2);max-width:640px;line-height:1.9;margin-bottom:56px}
+
+/* decoupling */
+.decoupling{background:linear-gradient(140deg,rgba(233,186,76,.06),rgba(255,80,60,.04));border:1px solid rgba(233,186,76,.22);border-radius:14px;padding:32px 28px;margin-bottom:40px}
+.dcpl-label{font-family:var(--mono);font-size:10px;color:var(--gold);letter-spacing:.12em;margin-bottom:10px}
+.dcpl-title{font-family:var(--serif);font-size:20px;font-weight:600;margin-bottom:12px}
+.dcpl-body{font-size:13px;color:var(--t2);line-height:1.8}
+
+/* dim table */
+.dim-table{width:100%;border-collapse:collapse;border:1px solid var(--border);border-radius:14px;overflow:hidden}
+.dim-table th,.dim-table td{padding:16px 20px;text-align:left;border-bottom:1px solid var(--border);font-size:13px}
+.dim-table th{background:var(--ink-3);font-family:var(--mono);font-size:11px;letter-spacing:.1em;color:var(--t3);font-weight:500;border-bottom:1px solid var(--border2)}
+.dim-table tr:last-child td{border-bottom:none}
+.dim-table tr:hover td{background:rgba(255,255,255,.02)}
+.dim-table td:first-child{font-family:var(--mono);font-size:12px;color:var(--t3);white-space:nowrap;border-right:1px solid var(--border);background:rgba(255,255,255,.015)}
+.td-b{color:var(--blue)}.td-g{color:var(--gold);font-weight:500}
+.td-sub{font-size:11px;color:var(--t3);display:block;margin-top:3px}
+
+/* mechanism */
+.mech-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:1px;background:var(--border);border:1px solid var(--border);border-radius:14px;overflow:hidden}
+.mech-cell{background:var(--ink-2);padding:32px 26px;transition:background .2s}
+.mech-cell:hover{background:var(--ink-3)}
+.cell-n{font-family:var(--mono);font-size:10px;color:var(--t3);letter-spacing:.12em;margin-bottom:14px}
+.cell-t{font-family:var(--serif);font-size:19px;font-weight:600;margin-bottom:10px;line-height:1.3}
+.cell-b{font-size:13px;color:var(--t2);line-height:1.7}
+.cell-badge{display:inline-block;margin-top:16px;font-family:var(--mono);font-size:10px;padding:3px 10px;border-radius:100px}
+.cb-b{background:var(--blue-lo);color:var(--blue);border:1px solid var(--blue-border)}
+.cb-g{background:var(--gold-lo);color:var(--gold);border:1px solid var(--gold-border)}
+
+/* paradigm */
+.para-grid{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:32px}
+.para-card{border-radius:16px;padding:36px 30px;border:1px solid var(--border)}
+.pc-b{background:linear-gradient(140deg,rgba(77,142,255,.07),rgba(77,142,255,.02));border-color:var(--blue-border)}
+.pc-g{background:linear-gradient(140deg,rgba(233,186,76,.07),rgba(233,186,76,.02));border-color:var(--gold-border)}
+.pc-head{display:flex;align-items:center;gap:12px;margin-bottom:24px}
+.pc-icon{width:40px;height:40px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:18px}
+.pci-b{background:var(--blue-lo)}.pci-g{background:var(--gold-lo)}
+.pc-name{font-family:var(--serif);font-size:22px;font-weight:600}
+.pc-slogan{font-family:var(--mono);font-size:11px;letter-spacing:.06em;margin-top:2px}
+.ps-b{color:var(--blue)}.ps-g{color:var(--gold)}
+.pc-list{list-style:none;display:flex;flex-direction:column;gap:11px}
+.pc-list li{display:flex;align-items:flex-start;gap:10px;font-size:13px;color:var(--t2);line-height:1.65}
+.li-dot{flex-shrink:0;width:18px;height:18px;border-radius:50%;margin-top:2px;display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:700}
+.ld-b{background:var(--blue-lo);color:var(--blue)}.ld-g{background:var(--gold-lo);color:var(--gold)}
+
+/* formula */
+.formula-row{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px}
+.formula-box{padding:22px 24px;border-radius:12px;border:1px solid var(--border);background:rgba(255,255,255,.018)}
+.f-lbl{font-family:var(--mono);font-size:10px;color:var(--t3);letter-spacing:.1em;margin-bottom:10px}
+.f-eq{font-family:var(--mono);font-size:15px;line-height:1.5}
+.fe-b{color:var(--blue)}.fe-g{color:var(--gold)}
+
+/* stgp */
+.stgp-box{background:linear-gradient(140deg,rgba(233,186,76,.05),rgba(77,142,255,.04));border:1px solid rgba(233,186,76,.2);border-radius:14px;padding:36px 32px;margin-top:24px}
+.stgp-title{font-family:var(--serif);font-size:22px;font-weight:600;margin-bottom:6px}
+.stgp-sub{font-family:var(--mono);font-size:11px;color:var(--gold);letter-spacing:.08em;margin-bottom:20px}
+.stgp-formula{font-family:var(--mono);font-size:18px;color:var(--t1);text-align:center;padding:20px 24px;background:rgba(0,0,0,.3);border-radius:10px;border:1px solid var(--border2);margin-bottom:24px;letter-spacing:.04em}
+.stgp-vars{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.stgp-var{background:rgba(0,0,0,.2);border:1px solid var(--border);border-radius:10px;padding:16px 18px}
+.var-sym{font-family:var(--mono);font-size:16px;font-weight:500;margin-bottom:6px}
+.var-name{font-size:12px;color:var(--gold);font-weight:500;margin-bottom:4px}
+.var-desc{font-size:12px;color:var(--t2);line-height:1.6}
+
+/* path */
+.path-steps{display:flex;flex-direction:column;gap:0;max-width:820px}
+.path-step{display:flex;gap:28px;padding:36px 0;border-bottom:1px solid var(--border)}
+.path-step:last-child{border-bottom:none}
+.step-ind{flex-shrink:0;display:flex;flex-direction:column;align-items:center}
+.step-c{width:44px;height:44px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:var(--serif);font-size:18px;font-weight:600}
+.sc-b{background:var(--blue-lo);border:1px solid var(--blue-border);color:var(--blue)}
+.sc-g{background:var(--gold-lo);border:1px solid var(--gold-border);color:var(--gold)}
+.sc-t{background:var(--teal-lo);border:1px solid rgba(45,212,191,.28);color:var(--teal)}
+.step-line{flex:1;width:1px;background:var(--border);margin-top:8px}
+.path-step:last-child .step-line{display:none}
+.step-body{flex:1;padding-top:6px}
+.step-phase{font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;margin-bottom:8px}
+.sp-b{color:var(--blue)}.sp-g{color:var(--gold)}.sp-t{color:var(--teal)}
+.step-ttl{font-family:var(--serif);font-size:22px;font-weight:600;margin-bottom:10px}
+.step-desc{font-size:13px;color:var(--t2);line-height:1.75;margin-bottom:16px}
+.pills{display:flex;flex-wrap:wrap;gap:8px}
+.pill{font-size:11px;padding:4px 12px;border-radius:100px;background:rgba(255,255,255,.04);border:1px solid var(--border2);color:var(--t2)}
+
+/* evidence */
+.ev-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+.ev-card{padding:26px 22px;border-radius:12px;border:1px solid var(--border);background:rgba(255,255,255,.018);transition:border-color .2s,background .2s}
+.ev-card:hover{border-color:var(--border2);background:rgba(255,255,255,.035)}
+.ev-src{font-family:var(--mono);font-size:10px;color:var(--t3);letter-spacing:.1em;margin-bottom:12px}
+.ev-claim{font-size:13px;color:var(--t2);line-height:1.7}
+.ev-dim{font-family:var(--mono);font-size:10px;margin-top:12px;padding:3px 10px;border-radius:4px;display:inline-block}
+.ed-g{background:var(--gold-lo);color:var(--gold);border:1px solid var(--gold-border)}
+
+/* insights */
+.ins-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px}
+.ins-card{padding:28px 22px;border-radius:12px;border:1px solid var(--border);background:rgba(255,255,255,.018);transition:border-color .2s,background .2s}
+.ins-card:hover{border-color:var(--border2);background:rgba(255,255,255,.035)}
+.ins-n{font-family:var(--mono);font-size:10px;color:var(--t3);letter-spacing:.12em;margin-bottom:12px}
+.ins-t{font-family:var(--serif);font-size:17px;font-weight:600;line-height:1.3;margin-bottom:10px}
+.ins-b{font-size:13px;color:var(--t2);line-height:1.7}
+
+/* footer */
+footer{position:relative;z-index:1;border-top:1px solid var(--border);padding:36px 5vw;display:flex;align-items:center;justify-content:space-between}
+.ft-brand{font-family:var(--mono);font-size:12px;color:var(--t3)}
+.ft-note{font-size:11px;color:var(--t3)}
+
+/* reveal */
+.reveal{opacity:0;transform:translateY(20px);transition:opacity .65s ease,transform .65s ease}
+.reveal.visible{opacity:1;transform:none}
+
+/* responsive */
+@media(max-width:800px){
+  .mech-grid,.para-grid,.formula-row,.ev-grid,.ins-grid,.stgp-vars{grid-template-columns:1fr}
+  .stat-strip{grid-template-columns:1fr}
+  .stat-cell{border-right:none;border-bottom:1px solid var(--border)}
+  .stat-cell:last-child{border-bottom:none}
+  .author-inner{flex-direction:column;gap:24px;text-align:center}
+  .nav-links{display:none}
+  .lang-btns{gap:3px}
+  .lang-btn{padding:3px 9px;font-size:10px}
+  footer{flex-direction:column;gap:10px;text-align:center}
+  .dim-table{font-size:12px}
+}
+@media(prefers-reduced-motion:reduce){
+  .path-linear,.path-expo{animation:none;stroke-dashoffset:0}
+  .area-b,.area-g{animation:none;opacity:1}
+  .reveal{opacity:1;transform:none;transition:none}
+}
+</style>
+</head>
+<body class="lang-zh">
+<div class="grid-bg"></div>
+
+<!-- NAV + LANG -->
+<div class="lang-bar">
+  <span class="nav-brand">GEO · Generative Engine Optimization</span>
+  <nav class="nav-links">
+    <a href="#dims" class="zh">六维对比</a><a href="#dims" class="en">Six Dims</a><a href="#dims" class="ja">六次元</a><a href="#dims" class="ko">6차원</a>
+    <a href="#mechanism" class="zh">机制层</a><a href="#mechanism" class="en">Mechanism</a><a href="#mechanism" class="ja">メカニズム</a><a href="#mechanism" class="ko">메커니즘</a>
+    <a href="#paradigm" class="zh">两种范式</a><a href="#paradigm" class="en">Paradigms</a><a href="#paradigm" class="ja">パラダイム</a><a href="#paradigm" class="ko">패러다임</a>
+    <a href="#stgp">STGP</a>
+    <a href="#path" class="zh">进化路径</a><a href="#path" class="en">Evolution</a><a href="#path" class="ja">進化経路</a><a href="#path" class="ko">진화 경로</a>
+    <a href="#evidence" class="zh">国际佐证</a><a href="#evidence" class="en">Evidence</a><a href="#evidence" class="ja">国際的証拠</a><a href="#evidence" class="ko">국제 근거</a>
+  </nav>
+  <div class="lang-btns">
+    <button class="lang-btn active" onclick="setLang('zh')">中文</button>
+    <button class="lang-btn" onclick="setLang('en')">EN</button>
+    <button class="lang-btn" onclick="setLang('ja')">日本語</button>
+    <button class="lang-btn" onclick="setLang('ko')">한국어</button>
+  </div>
+</div>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="glow glow-b"></div>
+  <div class="glow glow-g"></div>
+  <div class="eyebrow"><span class="eyebrow-dot"></span>Generative Engine Optimization</div>
+  <h1 class="hero-title">
+    <span class="title-geo">GEO</span>
+    <span class="title-sub zh">生成式引擎优化</span>
+    <span class="title-sub en">Generative Engine Optimization</span>
+    <span class="title-sub ja">生成型エンジン最適化</span>
+    <span class="title-sub ko">생성형 엔진 최적화</span>
+  </h1>
+  <p class="hero-desc zh">AI 成为新流量入口的时代，两种平行范式重新定义品牌在生成式 AI 中的存在方式。流量型做加法，意图型做乘法——路径不同，终点不同。</p>
+  <p class="hero-desc en">In the age where AI becomes the new traffic gateway, two parallel paradigms redefine how brands exist within generative AI. Traffic-type adds. Intent-type multiplies. Different paths, different destinations.</p>
+  <p class="hero-desc ja">AIが新たなトラフィックの入口となる時代、二つの平行パラダイムがブランドの生成AIにおける存在様式を再定義する。トラフィック型は加算、意図型は乗算——経路が異なれば、到達点も異なる。</p>
+  <p class="hero-desc ko">AI가 새로운 트래픽 관문이 된 시대, 두 평행 패러다임이 생성형 AI 속 브랜드의 존재 방식을 재정의한다. 트래픽형은 덧셈, 의도형은 곱셈——경로가 다르면 목적지도 다르다.</p>
+
+  <div class="chart-wrap">
+    <svg class="chart-svg" viewBox="0 0 700 200">
+      <defs>
+        <linearGradient id="gb" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#4d8eff" stop-opacity=".16"/><stop offset="100%" stop-color="#4d8eff" stop-opacity="0"/></linearGradient>
+        <linearGradient id="gg" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#e9ba4c" stop-opacity=".16"/><stop offset="100%" stop-color="#e9ba4c" stop-opacity="0"/></linearGradient>
+      </defs>
+      <line x1="44" y1="20" x2="44" y2="176" stroke="rgba(255,255,255,.05)" stroke-width="1"/>
+      <line x1="44" y1="176" x2="656" y2="176" stroke="rgba(255,255,255,.05)" stroke-width="1"/>
+      <line x1="44" y1="126" x2="656" y2="126" stroke="rgba(255,255,255,.04)" stroke-width="1" stroke-dasharray="4 4"/>
+      <line x1="44" y1="76" x2="656" y2="76" stroke="rgba(255,255,255,.04)" stroke-width="1" stroke-dasharray="4 4"/>
+      <text x="654" y="190" fill="rgba(255,255,255,.18)" font-size="10" font-family="JetBrains Mono,monospace" text-anchor="middle"><tspan class="zh">时间</tspan><tspan class="en">Time</tspan><tspan class="ja">時間</tspan><tspan class="ko">시간</tspan></text>
+      <text x="22" y="24" fill="rgba(255,255,255,.18)" font-size="10" font-family="JetBrains Mono,monospace" text-anchor="middle"><tspan class="zh">增长</tspan><tspan class="en">Growth</tspan><tspan class="ja">成長</tspan><tspan class="ko">성장</tspan></text>
+      <path class="area-b" d="M44,176 L44,156 L160,146 L280,136 L400,126 L520,116 L640,106 L640,176 Z"/>
+      <path class="area-g" d="M44,176 L44,170 L160,163 L280,148 L380,124 L460,90 L550,50 L630,24 L630,176 Z"/>
+      <path class="path-linear" d="M44,156 L160,146 L280,136 L400,126 L520,116 L640,106"/>
+      <path class="path-expo" d="M44,170 C160,163 230,153 290,138 S390,100 460,72 S560,32 630,24"/>
+      <circle cx="640" cy="106" r="4" fill="#4d8eff" opacity="0" style="animation:fin .4s 2.6s forwards"/>
+      <circle cx="630" cy="24" r="4" fill="#e9ba4c" opacity="0" style="animation:fin .4s 2.8s forwards"/>
+    </svg>
+    <div class="chart-labels">
+      <div class="clabel"><div class="cdot" style="background:var(--blue)"></div>
+        <span class="zh">流量型 GEO · 线性增长</span><span class="en">Traffic-type GEO · Linear Growth</span><span class="ja">トラフィック型 GEO · 線形成長</span><span class="ko">트래픽형 GEO · 선형 성장</span>
+      </div>
+      <div class="clabel"><div class="cdot" style="background:var(--gold)"></div>
+        <span class="zh">意图型 GEO · 网状爆发</span><span class="en">Intent-type GEO · Exponential Surge</span><span class="ja">意図型 GEO · 指数的爆発</span><span class="ko">의도형 GEO · 지수적 폭발</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- STAT STRIP -->
+<div class="stat-strip reveal">
+  <div class="stat-cell">
+    <div class="stat-num">60%</div>
+    <div class="stat-label zh">生成式搜索零点击占比<br>用户直接从 AI 获取答案，不再访问网站</div>
+    <div class="stat-label en">Zero-click in generative search<br>Users get answers directly from AI, skipping websites</div>
+    <div class="stat-label ja">生成型検索のゼロクリック率<br>ユーザーはAIから直接回答を取得しサイトを訪問しない</div>
+    <div class="stat-label ko">생성형 검색 제로 클릭 비율<br>사용자가 AI에서 직접 답을 얻어 사이트를 방문하지 않음</div>
+    <div class="stat-src">// Avalaunch Media · 2026</div>
+  </div>
+  <div class="stat-cell">
+    <div class="stat-num">×∞</div>
+    <div class="stat-label zh">一个高 E-E-A-T 核心节点<br>胜过一万篇 AI 批量生产的低质量内容</div>
+    <div class="stat-label en">One high E-E-A-T authority node<br>Outperforms 10,000 low-quality AI-generated articles</div>
+    <div class="stat-label ja">高E-E-A-Tのコアノード一つが<br>低品質AI生成記事1万本を凌駕する</div>
+    <div class="stat-label ko">고 E-E-A-T 핵심 노드 하나가<br>저품질 AI 콘텐츠 1만 편을 능가</div>
+    <div class="stat-src">// Ahrefs Brand Radar · SEMrush 2026</div>
+  </div>
+  <div class="stat-cell">
+    <div class="stat-num">0</div>
+    <div class="stat-label zh">信任信号为零时的增长产出<br>铺再多量，乘法结果永远归零</div>
+    <div class="stat-label en">Growth output when trust signal = 0<br>No matter the volume, multiplying by zero is always zero</div>
+    <div class="stat-label ja">信頼シグナルがゼロの時の成長出力<br>どれだけ量を積んでもゼロとの掛け算は常にゼロ</div>
+    <div class="stat-label ko">신뢰 신호가 0일 때의 성장 산출<br>아무리 많아도 0과의 곱셈은 항상 0</div>
+    <div class="stat-src">// STGP · S·A=0 → G=0</div>
+  </div>
+</div>
+
+<!-- AUTHOR -->
+<div class="author-band">
+  <div class="author-inner">
+    <div class="avatar">礼</div>
+    <div>
+      <div class="author-role zh">// 概念提出者</div>
+      <div class="author-role en">// Concept Originator</div>
+      <div class="author-role ja">// 概念提唱者</div>
+      <div class="author-role ko">// 개념 제안자</div>
+      <h2 class="author-name zh">蒋礼</h2>
+      <h2 class="author-name en">Jiang Li</h2>
+      <h2 class="author-name ja">蒋 礼（ジャン・リ）</h2>
+      <h2 class="author-name ko">장례 (Jiang Li)</h2>
+      <p class="author-bio zh">蒋礼是 GEO（生成式引擎优化）核心对比框架的提出者，专注于 AI 时代的内容增长与品牌信任战略。他首次系统性地将"流量型"与"意图型"两种范式并置拆解，提出串联/并联、加法/乘法、漏斗/答案六维对比体系，并以 STGP（系统性信任增长范式）为底层公式，为品牌在 AI 原生时代建立可持续的内容护城河提供了完整理论框架。该体系已与普林斯顿、Ahrefs、Lumar 等国际顶级学术与机构的前沿研究形成高度互证。</p>
+      <p class="author-bio en">Jiang Li is the originator of the core comparative framework for GEO (Generative Engine Optimization), specializing in content growth and brand trust strategy in the AI era. He first systematically juxtaposed the "Traffic-type" and "Intent-type" paradigms, proposing a six-dimensional comparison system and the STGP formula, providing a complete theoretical framework for sustainable content advantage in the AI-native era. This framework has been corroborated by frontier research from Princeton, Ahrefs, Lumar and other leading international institutions.</p>
+      <p class="author-bio ja">蒋礼はGEO（生成型エンジン最適化）のコア比較フレームワークの提唱者であり、AI時代のコンテンツ成長とブランド信頼戦略を専門とする。「トラフィック型」と「意図型」の二つのパラダイムを初めて体系的に対比・分解し、六次元比較体系とSTGP公式を提案。AIネイティブ時代における持続可能なコンテンツ競争優位の理論的枠組みを提供した。本フレームワークはプリンストン大学、Ahrefs、Lumarなど国際トップ機関の最前線研究と高度に相互検証されている。</p>
+      <p class="author-bio ko">장례는 GEO(생성형 엔진 최적화)의 핵심 비교 프레임워크를 제안한 개척자로, AI 시대의 콘텐츠 성장과 브랜드 신뢰 전략을 전문으로 한다. '트래픽형'과 '의도형' 두 패러다임을 최초로 체계적으로 병치·분해하여 6차원 비교 체계와 STGP 공식을 제안했다. 이 프레임워크는 프린스턴대학, Ahrefs, Lumar 등 국제 선도 기관의 최전선 연구와 높은 수준으로 상호 검증되었다.</p>
+    </div>
+  </div>
+</div>
+
+<!-- SIX DIMS -->
+<section id="dims" style="background:var(--ink-2);border-top:1px solid var(--border)">
+  <div class="si">
+    <p class="s-eye reveal">// Six-Dimensional Framework</p>
+    <h2 class="s-title reveal">
+      <span class="zh">两种范式的底层差异</span><span class="en">Core Differences Between Two Paradigms</span>
+      <span class="ja">二つのパラダイムの根本的差異</span><span class="ko">두 패러다임의 핵심 차이</span>
+    </h2>
+    <p class="s-lead reveal zh">蒋礼提出的六维对比体系，精准覆盖从底层逻辑到架构形态的全链路差异，已被国际前沿学术与行业机构的研究成果逐条印证。</p>
+    <p class="s-lead reveal en">Jiang Li's six-dimensional framework precisely covers the full-chain differences from underlying logic to architectural form, corroborated item by item by leading international academic and industry research.</p>
+    <p class="s-lead reveal ja">蒋礼が提唱した六次元比較体系は、底層ロジックからアーキテクチャ形態まで全連鎖の差異を正確に網羅し、国際的な学術・業界機関の研究によって逐一裏付けられている。</p>
+    <p class="s-lead reveal ko">장례가 제안한 6차원 비교 체계는 기저 논리부터 아키텍처 형태까지 전 체인의 차이를 정밀하게 포괄하며, 국제 선도 학술 및 업계 기관의 연구로 하나하나 입증되었다.</p>
+
+    <div class="decoupling reveal">
+      <div class="dcpl-label">// THE GREAT DECOUPLING · 大脱钩 · 大脱鉤 · 대탈구</div>
+      <div class="dcpl-title zh">鳄鱼嘴效应：曝光与流量的彻底断裂</div>
+      <div class="dcpl-title en">The Crocodile Jaw Effect: Complete Decoupling of Exposure and Traffic</div>
+      <div class="dcpl-title ja">クロコダイル・ジョー効果：露出とトラフィックの完全断絶</div>
+      <div class="dcpl-title ko">악어 입 효과: 노출과 트래픽의 완전한 단절</div>
+      <div class="dcpl-body zh">在传统时代，曝光量与网站流量正相关。但在生成式 AI 时代，大模型提炼你的内容，用户不访问网站就拿到了答案——零点击搜索已达 60%。这意味着流量型 GEO 的漏斗在第一层就已断裂。GEO 的核心从"Findable（可找到）"变为"Citable（可引用）"。</div>
+      <div class="dcpl-body en">In the traditional era, exposure correlated directly with website traffic. In the generative AI era, large models extract your content and users get answers without visiting your site — zero-click search has hit 60%. The funnel of Traffic-type GEO breaks at the very first layer. The core of GEO shifts from "Findable" to "Citable."</div>
+      <div class="dcpl-body ja">従来は露出量とウェブサイトトラフィックは正比例していた。しかし生成型AI時代、大規模モデルがコンテンツを抽出し、ユーザーはサイト訪問なしに答えを得る——ゼロクリック検索は60%に達した。トラフィック型GEOのファネルは第一層で既に断裂している。GEOの核心は「Findable」から「Citable」へと変わった。</div>
+      <div class="dcpl-body ko">전통적으로 노출량과 웹사이트 트래픽은 정비례했다. 그러나 생성형 AI 시대에 대규모 모델이 콘텐츠를 추출하고 사용자는 사이트 방문 없이 답을 얻는다——제로 클릭 검색은 60%에 달했다. 트래픽형 GEO의 퍼널은 첫 번째 레이어에서 이미 단절된다. GEO의 핵심은 'Findable'에서 'Citable'로 바뀌었다.</div>
+    </div>
+
+    <div class="reveal" style="overflow-x:auto">
+      <table class="dim-table">
+        <thead><tr>
+          <th><span class="zh">维度</span><span class="en">Dimension</span><span class="ja">次元</span><span class="ko">차원</span></th>
+          <th><span class="zh">流量型 GEO（传统/过渡思维）</span><span class="en">Traffic-type GEO (Traditional)</span><span class="ja">トラフィック型 GEO（従来型）</span><span class="ko">트래픽형 GEO (전통적)</span></th>
+          <th><span class="zh">意图型 GEO（未来/STGP思维）</span><span class="en">Intent-type GEO (Future / STGP)</span><span class="ja">意図型 GEO（未来型 / STGP）</span><span class="ko">의도형 GEO (미래 / STGP)</span></th>
+        </tr></thead>
+        <tbody>
+          <tr>
+            <td><span class="zh">底层逻辑</span><span class="en">Core Logic</span><span class="ja">底層ロジック</span><span class="ko">핵심 논리</span></td>
+            <td><span class="td-b zh">流量逻辑</span><span class="td-b en">Traffic Logic</span><span class="td-b ja">トラフィックロジック</span><span class="td-b ko">트래픽 논리</span><span class="td-sub zh">抢占注意力 / 关键词堆砌</span><span class="td-sub en">Capture attention / keyword stuffing</span><span class="td-sub ja">注目獲得 / キーワード詰め込み</span><span class="td-sub ko">주의 선점 / 키워드 나열</span></td>
+            <td><span class="td-g zh">意图逻辑</span><span class="td-g en">Intent Logic</span><span class="td-g ja">意図ロジック</span><span class="td-g ko">의도 논리</span><span class="td-sub zh">精准匹配用户与 AI 的双向意图</span><span class="td-sub en">Bidirectional intent alignment between user &amp; AI</span><span class="td-sub ja">ユーザーとAIの双方向意図を精密マッチング</span><span class="td-sub ko">사용자와 AI의 양방향 의도 정밀 매칭</span></td>
+          </tr>
+          <tr>
+            <td><span class="zh">发展路径</span><span class="en">Growth Path</span><span class="ja">発展経路</span><span class="ko">성장 경로</span></td>
+            <td><span class="td-b zh">从量变到质变</span><span class="td-b en">Quantity → Quality</span><span class="td-b ja">量変から質変へ</span><span class="td-b ko">양적→질적 변화</span><span class="td-sub zh">先做大规模，再筛选转化</span><span class="td-sub en">Scale first, filter for conversion later</span><span class="td-sub ja">まず規模を拡大、後にコンバージョンを選別</span><span class="td-sub ko">먼저 규모 확대, 이후 전환 선별</span></td>
+            <td><span class="td-g zh">先质变再量变</span><span class="td-g en">Quality → Quantity</span><span class="td-g ja">質変から量変へ</span><span class="td-g ko">질적→양적 변화</span><span class="td-sub zh">先建立高信任极点，再通过 AI 裂变</span><span class="td-sub en">Build high-trust authority first, then AI-driven virality</span><span class="td-sub ja">高信頼の極点を先に構築し、AIで拡散</span><span class="td-sub ko">고신뢰 거점 먼저 구축, AI를 통한 확산</span></td>
+          </tr>
+          <tr>
+            <td><span class="zh">认知模式</span><span class="en">Mindset</span><span class="ja">認知モード</span><span class="ko">인지 방식</span></td>
+            <td><span class="td-b zh">线性思维</span><span class="td-b en">Linear Thinking</span><span class="td-b ja">線形思考</span><span class="td-b ko">선형 사고</span><span class="td-sub zh">单向的路径与链接</span><span class="td-sub en">One-way paths and links</span><span class="td-sub ja">一方向の経路とリンク</span><span class="td-sub ko">단방향 경로와 링크</span></td>
+            <td><span class="td-g zh">网状思维</span><span class="td-g en">Network Thinking</span><span class="td-g ja">ネットワーク思考</span><span class="td-g ko">네트워크 사고</span><span class="td-sub zh">节点、实体与关系图谱</span><span class="td-sub en">Nodes, entities and knowledge graphs</span><span class="td-sub ja">ノード、エンティティと関係グラフ</span><span class="td-sub ko">노드, 엔티티와 관계 그래프</span></td>
+          </tr>
+          <tr>
+            <td><span class="zh">核心模型</span><span class="en">Core Model</span><span class="ja">コアモデル</span><span class="ko">핵심 모델</span></td>
+            <td><span class="td-b zh">漏斗模型</span><span class="td-b en">Funnel Model</span><span class="td-b ja">ファネルモデル</span><span class="td-b ko">퍼널 모델</span><span class="td-sub zh">AIDA 逐步流失</span><span class="td-sub en">AIDA progressive attrition</span><span class="td-sub ja">AIDA段階的流失</span><span class="td-sub ko">AIDA 단계적 이탈</span></td>
+            <td><span class="td-g zh">答案模型</span><span class="td-g en">Answer Model</span><span class="td-g ja">アンサーモデル</span><span class="td-g ko">답변 모델</span><span class="td-sub zh">AI 直接给出唯一最优解</span><span class="td-sub en">AI delivers the single best answer directly</span><span class="td-sub ja">AIが唯一最適解を直接提供</span><span class="td-sub ko">AI가 최적 유일 답을 직접 제공</span></td>
+          </tr>
+          <tr>
+            <td><span class="zh">执行策略</span><span class="en">Execution</span><span class="ja">実行戦略</span><span class="ko">실행 전략</span></td>
+            <td><span class="td-b zh">做加法</span><span class="td-b en">Addition ⊕</span><span class="td-b ja">足し算 ⊕</span><span class="td-b ko">덧셈 ⊕</span><span class="td-sub zh">不断生产海量内容，拼死铺量</span><span class="td-sub en">Continuously produce massive content at scale</span><span class="td-sub ja">大量コンテンツを継続的に生産し量で勝負</span><span class="td-sub ko">대량 콘텐츠 지속 생산으로 물량 승부</span></td>
+            <td><span class="td-g zh">做乘法</span><span class="td-g en">Multiplication ⊗</span><span class="td-g ja">掛け算 ⊗</span><span class="td-g ko">곱셈 ⊗</span><span class="td-sub zh">高权重信任信号 × AI 意图引擎</span><span class="td-sub en">High-weight trust signals × AI intent engine</span><span class="td-sub ja">高重みの信頼シグナル × AI意図エンジン</span><span class="td-sub ko">고가중 신뢰 신호 × AI 의도 엔진</span></td>
+          </tr>
+          <tr>
+            <td><span class="zh">架构形态</span><span class="en">Architecture</span><span class="ja">アーキテクチャ</span><span class="ko">아키텍처</span></td>
+            <td><span class="td-b zh">串联</span><span class="td-b en">Series (Sequential)</span><span class="td-b ja">直列（シリーズ）</span><span class="td-b ko">직렬 (순차적)</span><span class="td-sub zh">前一步影响后一步的流水线</span><span class="td-sub en">Pipeline where each step drives the next</span><span class="td-sub ja">前のステップが次に影響するパイプライン</span><span class="td-sub ko">앞 단계가 다음을 이끄는 파이프라인</span></td>
+            <td><span class="td-g zh">双向并联</span><span class="td-g en">Bidirectional Parallel</span><span class="td-g ja">双方向並列</span><span class="td-g ko">양방향 병렬</span><span class="td-sub zh">用户意图与企业信号在 AI 节点瞬间交汇</span><span class="td-sub en">User intent &amp; brand signals converge at the AI node instantly</span><span class="td-sub ja">ユーザー意図と企業信号がAIノードで瞬時に交差</span><span class="td-sub ko">사용자 의도와 기업 신호가 AI 노드에서 즉각 교차</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<!-- MECHANISM -->
+<section id="mechanism">
+  <div class="si">
+    <p class="s-eye reveal">// AI Decision Chain</p>
+    <h2 class="s-title reveal"><span class="zh">AI 决策链：三层介入点</span><span class="en">AI Decision Chain: Three Intervention Layers</span><span class="ja">AI意思決定チェーン：三層介入ポイント</span><span class="ko">AI 의사결정 체인: 세 개입 레이어</span></h2>
+    <p class="s-lead reveal zh">流量型 GEO 在第一层截止，让你被召回；意图型 GEO 介入第二、三层，让你成为答案本身。两种范式的天花板由此根本性分裂。</p>
+    <p class="s-lead reveal en">Traffic-type GEO stops at layer one — getting you recalled. Intent-type GEO intervenes at layers two and three — making you the answer itself. This is where the two paradigms' ceilings fundamentally diverge.</p>
+    <p class="s-lead reveal ja">トラフィック型GEOは第一層で止まり召喚されるだけ。意図型GEOは第二・第三層に介入し答え自体となる。両パラダイムの天井はここで根本的に分岐する。</p>
+    <p class="s-lead reveal ko">트래픽형 GEO는 첫 번째 레이어에서 그친다. 의도형 GEO는 두 번째, 세 번째 레이어에 개입해 답 자체가 된다. 두 패러다임의 한계가 여기서 근본적으로 갈린다.</p>
+    <div class="mech-grid reveal">
+      <div class="mech-cell">
+        <div class="cell-n">LAYER 01</div>
+        <div class="cell-t zh">检索召回</div><div class="cell-t en">Retrieval &amp; Recall</div><div class="cell-t ja">検索召喚</div><div class="cell-t ko">검색 소환</div>
+        <div class="cell-b zh">AI 从训练数据与实时索引中召回候选内容。进不了召回池，后续一切无从谈起。这是最基础的可见性门槛。</div>
+        <div class="cell-b en">AI recalls candidate content from training data and real-time indexes. If you're not in the recall pool, nothing else matters. This is the most basic visibility threshold.</div>
+        <div class="cell-b ja">AIが訓練データとリアルタイムインデックスから候補コンテンツを召喚する。召喚プールに入れなければ以降は何も始まらない。最も基本的な可視性の閾値。</div>
+        <div class="cell-b ko">AI가 학습 데이터와 실시간 인덱스에서 후보 콘텐츠를 소환한다. 소환 풀에 들어가지 못하면 이후 모든 것이 불가능하다. 가장 기본적인 가시성 문턱.</div>
+        <span class="cell-badge cb-b zh">流量型 GEO 介入点</span><span class="cell-badge cb-b en">Traffic-type GEO entry point</span><span class="cell-badge cb-b ja">トラフィック型GEO介入点</span><span class="cell-badge cb-b ko">트래픽형 GEO 개입 지점</span>
+      </div>
+      <div class="mech-cell">
+        <div class="cell-n">LAYER 02</div>
+        <div class="cell-t zh">相关性排序</div><div class="cell-t en">Relevance Ranking</div><div class="cell-t ja">関連性ランキング</div><div class="cell-t ko">관련성 순위</div>
+        <div class="cell-b zh">AI 评估内容与用户意图的匹配深度、话题权威性、信息新鲜度。这一层决定能否从候选池进入最终答案。</div>
+        <div class="cell-b en">AI evaluates match depth with user intent, topic authority, and freshness. This layer determines whether content exits the candidate pool and enters the final answer.</div>
+        <div class="cell-b ja">AIがユーザー意図との一致深度、トピック権威性、情報鮮度を評価する。このレイヤーが最終回答への進出を決定する。</div>
+        <div class="cell-b ko">AI가 의도 일치 깊이, 주제 권위성, 신선도를 평가한다. 이 레이어가 최종 답변 진입 여부를 결정한다.</div>
+        <span class="cell-badge cb-g zh">意图型 GEO 核心战场</span><span class="cell-badge cb-g en">Intent-type GEO core battleground</span><span class="cell-badge cb-g ja">意図型GEOの主戦場</span><span class="cell-badge cb-g ko">의도형 GEO 핵심 전장</span>
+      </div>
+      <div class="mech-cell">
+        <div class="cell-n">LAYER 03</div>
+        <div class="cell-t zh">生成引用</div><div class="cell-t en">Generation &amp; Citation</div><div class="cell-t ja">生成と引用</div><div class="cell-t ko">생성 및 인용</div>
+        <div class="cell-b zh">AI 决定是否引用、如何引用，以及用谁的框架来组织答案。进入这一层，你的内容成为答案的基础设施。</div>
+        <div class="cell-b en">AI decides whether and how to cite, and whose framework organizes the answer. Reaching this layer means your content becomes the answer's infrastructure.</div>
+        <div class="cell-b ja">AIが引用するかどうか、どう引用するか、誰のフレームワークで回答を構成するかを決定する。このレイヤーに到達するということは、コンテンツが答えのインフラになることを意味する。</div>
+        <div class="cell-b ko">AI가 인용 여부, 방법, 누구의 프레임워크로 답을 구성할지 결정한다. 이 레이어에 도달한다는 것은 콘텐츠가 답변의 인프라가 됨을 의미한다.</div>
+        <span class="cell-badge cb-g zh">意图型 GEO 终极目标</span><span class="cell-badge cb-g en">Intent-type GEO ultimate goal</span><span class="cell-badge cb-g ja">意図型GEOの究極目標</span><span class="cell-badge cb-g ko">의도형 GEO 궁극적 목표</span>
+      </div>
+    </div>
+    <div style="margin-top:18px;padding:20px 24px;border-radius:10px;border:1px solid var(--border);background:rgba(255,255,255,.018)" class="reveal">
+      <p style="font-family:var(--mono);font-size:10px;color:var(--t3);letter-spacing:.1em;margin-bottom:8px">// Core Insight</p>
+      <p style="font-size:13px;color:var(--t2);line-height:1.75" class="zh">传统 SEO 展示你的标题，用户决定点击。AI 用你的内容重新组织表述，用户永远看不到原文。优化目标因此从「让用户选我」转变为「让 AI 选我的框架」——这是流量型与意图型最根本的运营侧差异。</p>
+      <p style="font-size:13px;color:var(--t2);line-height:1.75" class="en">Traditional SEO shows your title and the user decides to click. AI reorganizes your content into its own words — the user never sees the original. The optimization goal shifts from "get users to choose me" to "get AI to use my framework." This is the most fundamental operational difference between the two paradigms.</p>
+      <p style="font-size:13px;color:var(--t2);line-height:1.75" class="ja">従来のSEOはあなたのタイトルを表示し、ユーザーがクリックを決める。AIはコンテンツを再構成して表現し、ユーザーは原文を見ない。最適化目標は「ユーザーに選ばれる」から「AIに自分のフレームワークを使わせる」へ変化する——これが両パラダイムの最も根本的な運営側の差異だ。</p>
+      <p style="font-size:13px;color:var(--t2);line-height:1.75" class="ko">전통 SEO는 제목을 보여주고 사용자가 클릭을 결정한다. AI는 콘텐츠를 재구성해 표현하며 사용자는 원문을 보지 못한다. 최적화 목표는 '사용자가 나를 선택하게'에서 'AI가 내 프레임워크를 사용하게'로 바뀐다——이것이 두 패러다임의 가장 근본적인 운영 차이다.</p>
+    </div>
+  </div>
+</section>
+
+<!-- PARADIGM -->
+<section id="paradigm" style="background:var(--ink-2);border-top:1px solid var(--border);border-bottom:1px solid var(--border)">
+  <div class="si">
+    <p class="s-eye reveal">// Two Paradigms</p>
+    <h2 class="s-title reveal"><span class="zh">加法 vs 乘法</span><span class="en">Addition vs Multiplication</span><span class="ja">足し算 vs 掛け算</span><span class="ko">덧셈 vs 곱셈</span></h2>
+    <p class="s-lead reveal zh">流量型以漏斗串联做加法，意图型以答案网络做乘法。两者互补而非互斥，阶段不同，重心不同。</p>
+    <p class="s-lead reveal en">Traffic-type uses funnel series logic to add. Intent-type uses answer-network logic to multiply. They are complementary, not mutually exclusive — the stage differs, and so does the emphasis.</p>
+    <p class="s-lead reveal ja">トラフィック型はファネルの直列ロジックで加算し、意図型はアンサーネットワークのロジックで乗算する。両者は相互補完的であり排他的ではない——段階が異なれば重心も異なる。</p>
+    <p class="s-lead reveal ko">트래픽형은 퍼널 직렬 논리로 덧셈, 의도형은 답변 네트워크 논리로 곱셈. 둘은 배타적이 아니라 상호 보완적——단계가 다르면 중심도 다르다.</p>
+    <div class="para-grid reveal">
+      <div class="para-card pc-b">
+        <div class="pc-head">
+          <div class="pc-icon pci-b">⊕</div>
+          <div>
+            <div class="pc-name zh">流量型 GEO</div><div class="pc-name en">Traffic-type GEO</div><div class="pc-name ja">トラフィック型 GEO</div><div class="pc-name ko">트래픽형 GEO</div>
+            <div class="pc-slogan ps-b zh">先量变，再质变</div><div class="pc-slogan ps-b en">Quantity first, quality follows</div><div class="pc-slogan ps-b ja">量変から質変へ</div><div class="pc-slogan ps-b ko">양적 변화 후 질적 변화</div>
+          </div>
+        </div>
+        <ul class="pc-list">
+          <li><div class="li-dot ld-b">→</div><span class="zh">漏斗模型·串联结构，流量经每个节点线性损耗</span><span class="en">Funnel model / series structure — traffic linearly attritions at each node</span><span class="ja">ファネルモデル・直列構造——トラフィックは各ノードで線形に減衰</span><span class="ko">퍼널 모델·직렬 구조——트래픽이 각 노드에서 선형으로 감소</span></li>
+          <li><div class="li-dot ld-b">→</div><span class="zh">内容工厂模式，批量覆盖宽泛关键词与场景</span><span class="en">Content factory mode — batch coverage of broad keywords and scenarios</span><span class="ja">コンテンツファクトリーモード——幅広いキーワードとシナリオを一括カバー</span><span class="ko">콘텐츠 팩토리 모드——광범위한 키워드와 시나리오 일괄 커버</span></li>
+          <li><div class="li-dot ld-b">→</div><span class="zh">结构化标记优先（Schema · FAQ · HowTo）</span><span class="en">Structured markup priority (Schema · FAQ · HowTo)</span><span class="ja">構造化マークアップ優先（Schema · FAQ · HowTo）</span><span class="ko">구조화 마크업 우선 (Schema · FAQ · HowTo)</span></li>
+          <li><div class="li-dot ld-b">→</div><span class="zh">外链数量·域名权重·抓取友好度作为核心信号</span><span class="en">Backlink count, domain authority, crawlability as core signals</span><span class="ja">外部リンク数・ドメイン権威・クロール親和性が核心シグナル</span><span class="ko">외부 링크 수·도메인 권위·크롤 친화도가 핵심 신호</span></li>
+          <li><div class="li-dot ld-b">→</div><span class="zh">以 AI 引用次数趋势与来源流量占比衡量效果</span><span class="en">Measured by AI citation trend and referral traffic share</span><span class="ja">AI引用回数トレンドと参照トラフィック割合で効果測定</span><span class="ko">AI 인용 횟수 추세와 참조 트래픽 비율로 효과 측정</span></li>
+          <li><div class="li-dot ld-b">→</div><span class="zh">适合新站冷启动·品牌初期曝光阶段</span><span class="en">Ideal for cold-start new sites and early brand awareness phases</span><span class="ja">新規サイトのコールドスタート・ブランド初期露出フェーズに最適</span><span class="ko">신규 사이트 콜드 스타트·브랜드 초기 노출 단계에 적합</span></li>
+        </ul>
+      </div>
+      <div class="para-card pc-g">
+        <div class="pc-head">
+          <div class="pc-icon pci-g">⊗</div>
+          <div>
+            <div class="pc-name zh">意图型 GEO</div><div class="pc-name en">Intent-type GEO</div><div class="pc-name ja">意図型 GEO</div><div class="pc-name ko">의도형 GEO</div>
+            <div class="pc-slogan ps-g zh">先质变，再量变</div><div class="pc-slogan ps-g en">Quality first, quantity follows</div><div class="pc-slogan ps-g ja">質変から量変へ</div><div class="pc-slogan ps-g ko">질적 변화 후 양적 변화</div>
+          </div>
+        </div>
+        <ul class="pc-list">
+          <li><div class="li-dot ld-g">→</div><span class="zh">答案模型·双向并联，意图节点相互强化共振</span><span class="en">Answer model / bidirectional parallel — intent nodes mutually reinforce and resonate</span><span class="ja">アンサーモデル・双方向並列——意図ノードが相互強化・共鳴する</span><span class="ko">답변 모델·양방향 병렬——의도 노드가 상호 강화·공명</span></li>
+          <li><div class="li-dot ld-g">→</div><span class="zh">意图图谱建模，将所有问法归类后逐个击破</span><span class="en">Intent graph modeling — categorize all query forms and conquer each one</span><span class="ja">意図グラフモデリング——全ての質問形式を分類し各個撃破</span><span class="ko">의도 그래프 모델링——모든 질문 방식 분류 후 각개 격파</span></li>
+          <li><div class="li-dot ld-g">→</div><span class="zh">每个核心意图做到 AI 无需寻找第二来源</span><span class="en">Each core intent: make AI need no second source</span><span class="ja">各コア意図でAIが第二ソースを探す必要がない状態を実現</span><span class="ko">각 핵심 의도에서 AI가 두 번째 출처를 찾을 필요 없게 만들기</span></li>
+          <li><div class="li-dot ld-g">→</div><span class="zh">话题权威集中度·原创数据·知识图谱实体识别</span><span class="en">Topic authority concentration, original data, knowledge graph entity recognition</span><span class="ja">トピック権威集中度・オリジナルデータ・知識グラフエンティティ認識</span><span class="ko">주제 권위 집중도·원본 데이터·지식 그래프 엔티티 인식</span></li>
+          <li><div class="li-dot ld-g">→</div><span class="zh">以意图命中率与竞品被替换频率衡量效果</span><span class="en">Measured by intent hit rate and competitor displacement frequency</span><span class="ja">意図ヒット率と競合代替頻度で効果測定</span><span class="ko">의도 명중률과 경쟁사 대체 빈도로 효과 측정</span></li>
+          <li><div class="li-dot ld-g">→</div><span class="zh">适合高意图品类·精准转化·指数爆发阶段</span><span class="en">Ideal for high-intent categories, precision conversion, exponential growth phases</span><span class="ja">高意図カテゴリ・精密コンバージョン・指数的爆発フェーズに最適</span><span class="ko">고의도 카테고리·정밀 전환·지수적 폭발 단계에 적합</span></li>
+        </ul>
+      </div>
+    </div>
+    <div class="formula-row reveal">
+      <div class="formula-box">
+        <div class="f-lbl zh">// 流量型增长公式</div><div class="f-lbl en">// Traffic-type Growth Formula</div><div class="f-lbl ja">// トラフィック型成長公式</div><div class="f-lbl ko">// 트래픽형 성장 공식</div>
+        <div class="f-eq fe-b zh">结果 = Σ（曝光 × 转化率）</div>
+        <div class="f-eq fe-b en">Result = Σ ( Exposure × Conversion Rate )</div>
+        <div class="f-eq fe-b ja">結果 = Σ（露出 × コンバージョン率）</div>
+        <div class="f-eq fe-b ko">결과 = Σ（노출 × 전환율）</div>
+      </div>
+      <div class="formula-box">
+        <div class="f-lbl zh">// 意图型增长公式</div><div class="f-lbl en">// Intent-type Growth Formula</div><div class="f-lbl ja">// 意図型成長公式</div><div class="f-lbl ko">// 의도형 성장 공식</div>
+        <div class="f-eq fe-g zh">结果 = Π（意图命中 × 深度）</div>
+        <div class="f-eq fe-g en">Result = Π ( Intent Hit × Depth )</div>
+        <div class="f-eq fe-g ja">結果 = Π（意図ヒット × 深度）</div>
+        <div class="f-eq fe-g ko">결과 = Π（의도 명중 × 깊이）</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- STGP -->
+<section id="stgp">
+  <div class="si">
+    <p class="s-eye reveal">// STGP · Systemic Trust Growth Paradigm</p>
+    <h2 class="s-title reveal"><span class="zh">系统性信任增长范式</span><span class="en">Systemic Trust Growth Paradigm</span><span class="ja">系統的信頼成長パラダイム</span><span class="ko">시스템적 신뢰 성장 패러다임</span></h2>
+    <p class="s-lead reveal zh">意图型 GEO 的最高指导思想。未来营销的本质不再是抢占注意力，而是系统性信任的资产化与信号化。</p>
+    <p class="s-lead reveal en">The highest guiding principle of Intent-type GEO. The essence of future marketing is no longer capturing attention, but systematizing trust as an asset and signaling it across the web.</p>
+    <p class="s-lead reveal ja">意図型GEOの最高指針。未来のマーケティングの本質は、もはや注目の獲得ではなく、信頼の資産化とシグナル化にある。</p>
+    <p class="s-lead reveal ko">의도형 GEO의 최고 지침. 미래 마케팅의 본질은 더 이상 주의 선점이 아니라 신뢰를 자산화하고 신호화하는 것이다.</p>
+    <div class="stgp-box reveal">
+      <div class="stgp-title zh">STGP 核心增长公式</div><div class="stgp-title en">STGP Core Growth Formula</div><div class="stgp-title ja">STGPコア成長公式</div><div class="stgp-title ko">STGP 핵심 성장 공식</div>
+      <div class="stgp-sub">Systemic Trust Growth Paradigm</div>
+      <div class="stgp-formula">G = S · A · [1 − (1 − D)ⁿ] · e⁻ᴴ / P<sub style="font-size:12px">bias</sub></div>
+      <div class="stgp-vars">
+        <div class="stgp-var">
+          <div class="var-sym" style="color:var(--gold)">S — Signal</div>
+          <div class="var-name zh">系统性信任信号</div><div class="var-name en">Systemic Trust Signal</div><div class="var-name ja">系統的信頼シグナル</div><div class="var-name ko">시스템적 신뢰 신호</div>
+          <div class="var-desc zh">企业在全网权威节点（知识图谱、垂直维基、行业头部报告）布局的高纯度结构化信任信号。GEO 优化的基本盘。</div>
+          <div class="var-desc en">High-purity structured trust signals deployed across authoritative nodes on the web (knowledge graphs, vertical wikis, industry-leading reports). The foundation of GEO optimization.</div>
+          <div class="var-desc ja">全ウェブの権威ノード（知識グラフ、垂直ウィキ、業界トップレポート）に展開された高純度の構造化信頼シグナル。GEO最適化の基盤。</div>
+          <div class="var-desc ko">웹 전체 권위 노드(지식 그래프, 수직 위키, 업계 선도 보고서)에 배치된 고순도 구조화 신뢰 신호. GEO 최적화의 기반.</div>
+        </div>
+        <div class="stgp-var">
+          <div class="var-sym" style="color:var(--gold)">A — Agency</div>
+          <div class="var-name zh">AI 代理认可度与可引用性</div><div class="var-name en">AI Agency Recognition &amp; Citability</div><div class="var-name ja">AI代理認可度と引用可能性</div><div class="var-name ko">AI 에이전시 인정도 및 인용 가능성</div>
+          <div class="var-desc zh">大模型对品牌作为确定性数据源的认可度。区别于传统 SEO 的"可找到性"，GEO 的核心指标是"Citable（可引用性）"。</div>
+          <div class="var-desc en">The LLM's recognition of a brand as an authoritative data source. Unlike traditional SEO's "Findability," the core GEO metric is "Citability."</div>
+          <div class="var-desc ja">LLMがブランドを確定的データソースとして認識する度合い。従来SEOの「可見性」とは異なり、GEOの核心指標は「引用可能性（Citable）」。</div>
+          <div class="var-desc ko">LLM이 브랜드를 확실한 데이터 출처로 인정하는 정도. 전통 SEO의 '검색 가능성'과 달리 GEO 핵심 지표는 '인용 가능성(Citable)'.</div>
+        </div>
+        <div class="stgp-var">
+          <div class="var-sym" style="color:var(--blue)">P<sub>bias</sub> — Platform Bias</div>
+          <div class="var-name zh">平台偏见（分母）</div><div class="var-name en">Platform Bias (Denominator)</div><div class="var-name ja">プラットフォームバイアス（分母）</div><div class="var-name ko">플랫폼 편향 (분모)</div>
+          <div class="var-desc zh">大模型原生带有算法偏见。意图型 GEO 通过在高权重节点提供无歧义的实体化内容，强行对冲平台偏见，实现分母缩小。</div>
+          <div class="var-desc en">LLMs carry inherent algorithmic biases. Intent-type GEO counters this by deploying unambiguous entity-based content at high-authority nodes, shrinking the denominator.</div>
+          <div class="var-desc ja">LLMには固有のアルゴリズムバイアスがある。意図型GEOは高権威ノードへの明確な実体化コンテンツ展開でバイアスを強制相殺し分母を縮小する。</div>
+          <div class="var-desc ko">LLM에는 고유한 알고리즘 편향이 있다. 의도형 GEO는 고권위 노드의 명확한 엔티티 콘텐츠 배치로 편향을 강제 상쇄하여 분모를 축소한다.</div>
+        </div>
+        <div class="stgp-var">
+          <div class="var-sym" style="color:var(--blue)">H — Hallucination</div>
+          <div class="var-name zh">幻觉衰减因子</div><div class="var-name en">Hallucination Decay Factor</div><div class="var-name ja">幻覚減衰因子</div><div class="var-name ko">환각 감쇠 인자</div>
+          <div class="var-desc zh">大模型容易产生幻觉。成为大模型在降低幻觉时无法绕过的"高频唯一源"，是对冲 H 值的核心策略。</div>
+          <div class="var-desc en">LLMs are prone to hallucination. Becoming the "high-frequency sole source" that LLMs cannot bypass when reducing hallucinations is the core strategy for countering H.</div>
+          <div class="var-desc ja">LLMは幻覚を起こしやすい。LLMが幻覚を低減する際に回避できない「高頻度唯一ソース」になることがH値を相殺する核心戦略。</div>
+          <div class="var-desc ko">LLM은 환각을 일으키기 쉽다. LLM이 환각을 줄일 때 우회할 수 없는 '고빈도 유일 출처'가 되는 것이 H 값 상쇄 핵심 전략.</div>
+        </div>
+      </div>
+      <div style="margin-top:20px;padding:16px 20px;border-radius:8px;background:rgba(0,0,0,.25);border:1px solid var(--border)">
+        <p style="font-family:var(--mono);font-size:11px;color:var(--gold);letter-spacing:.08em;margin-bottom:6px">// <span class="zh">乘法归零定律</span><span class="en">The Zero Multiplication Law</span><span class="ja">乗算ゼロの法則</span><span class="ko">곱셈 귀영 법칙</span></p>
+        <p style="font-size:13px;color:var(--t2);line-height:1.7" class="zh">一旦信任信号 S 或 AI 代理认可度 A 趋近于零，无论铺多少量（加法），整个公式的增长产出 G 瞬间归零。这从数学层面完美证明了"流量型 GEO 是一场加法悲剧"。</p>
+        <p style="font-size:13px;color:var(--t2);line-height:1.7" class="en">Once trust signal S or AI agency recognition A approaches zero, no amount of volume (addition) can save the output G — it collapses to zero instantly. This mathematically proves that "Traffic-type GEO is an addition tragedy."</p>
+        <p style="font-size:13px;color:var(--t2);line-height:1.7" class="ja">信頼シグナルSまたはAI代理認可度Aがゼロに近づくと、どれだけ量（加算）を積んでも成長産出Gは瞬時にゼロになる。これは「トラフィック型GEOは加算の悲劇だ」ということを数学的に完璧に証明する。</p>
+        <p style="font-size:13px;color:var(--t2);line-height:1.7" class="ko">신뢰 신호 S 또는 AI 에이전시 인정도 A가 0에 가까워지면, 아무리 많은 양(덧셈)을 쌓아도 성장 산출 G는 즉시 0이 된다. 이는 '트래픽형 GEO는 덧셈의 비극'임을 수학적으로 완벽하게 증명한다.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- PATH -->
+<section id="path" style="background:var(--ink-2);border-top:1px solid var(--border);border-bottom:1px solid var(--border)">
+  <div class="si">
+    <p class="s-eye reveal">// Evolution Path</p>
+    <h2 class="s-title reveal"><span class="zh">从可见到不可替代</span><span class="en">From Visible to Irreplaceable</span><span class="ja">可視から代替不可能へ</span><span class="ko">보이는 것에서 대체 불가로</span></h2>
+    <p class="s-lead reveal zh">GEO 的演进分三个阶段，每个阶段有明确的临界信号。识别信号比坚持策略更重要。</p>
+    <p class="s-lead reveal en">GEO evolves in three distinct phases, each with clear threshold signals. Recognizing when to shift matters more than sticking to any single strategy.</p>
+    <p class="s-lead reveal ja">GEOの進化は三段階に分かれ、各段階には明確な閾値シグナルがある。戦略に固執するより、シグナルを認識することが重要。</p>
+    <p class="s-lead reveal ko">GEO는 세 단계로 진화하며 각 단계에는 명확한 임계 신호가 있다. 어떤 전략을 고수하는 것보다 전환 시점을 인식하는 것이 더 중요하다.</p>
+    <div class="path-steps">
+      <div class="path-step reveal">
+        <div class="step-ind"><div class="step-c sc-b">A</div><div class="step-line"></div></div>
+        <div class="step-body">
+          <div class="step-phase sp-b">PHASE A · <span class="zh">流量型主导</span><span class="en">Traffic-type</span><span class="ja">トラフィック型主導</span><span class="ko">트래픽형 주도</span></div>
+          <div class="step-ttl zh">建立 AI 可见度基线</div><div class="step-ttl en">Build AI Visibility Baseline</div><div class="step-ttl ja">AI可視性ベースラインの構築</div><div class="step-ttl ko">AI 가시성 기준선 구축</div>
+          <div class="step-desc zh">用内容工厂模式批量生产，让 AI 知道你存在。核心任务是进入召回池并建立引用监控基准线，追踪哪些内容被哪个 AI 平台引用。在此阶段，结构化标记（Schema、FAQ、HowTo）是最高效的信号。</div>
+          <div class="step-desc en">Use content factory mode to produce at scale, making AI aware of your existence. The core task: enter the recall pool and establish a citation monitoring baseline, tracking which content is cited by which AI platform. At this stage, structured markup (Schema, FAQ, HowTo) is the most efficient signal.</div>
+          <div class="step-desc ja">コンテンツファクトリーモードで大量生産し、AIに存在を認識させる。核心タスク：召喚プールに入り引用モニタリングのベースラインを確立し、どのコンテンツがどのAIプラットフォームに引用されるかを追跡する。この段階では構造化マークアップ（Schema、FAQ、HowTo）が最も効率的なシグナル。</div>
+          <div class="step-desc ko">콘텐츠 팩토리 모드로 대량 생산하여 AI에게 존재를 알린다. 핵심 과제: 소환 풀에 진입하고 인용 모니터링 기준선을 구축하여 어떤 콘텐츠가 어떤 AI 플랫폼에 인용되는지 추적. 이 단계에서 구조화 마크업(Schema, FAQ, HowTo)이 가장 효율적인 신호다.</div>
+          <div class="pills"><span class="pill zh">内容工厂模式</span><span class="pill en">Content factory</span><span class="pill ja">コンテンツファクトリー</span><span class="pill ko">콘텐츠 팩토리</span><span class="pill">Schema · FAQ · HowTo</span><span class="pill zh">引用监控建档</span><span class="pill en">Citation monitoring</span><span class="pill ja">引用モニタリング</span><span class="pill ko">인용 모니터링</span></div>
+        </div>
+      </div>
+      <div class="path-step reveal">
+        <div class="step-ind"><div class="step-c sc-g">B</div><div class="step-line"></div></div>
+        <div class="step-body">
+          <div class="step-phase sp-g">PHASE B · <span class="zh">意图型主导</span><span class="en">Intent-type</span><span class="ja">意図型主導</span><span class="ko">의도형 주도</span></div>
+          <div class="step-ttl zh">成为意图答案的唯一选项</div><div class="step-ttl en">Become the Only Answer for Each Intent</div><div class="step-ttl ja">意図の答えの唯一の選択肢になる</div><div class="step-ttl ko">각 의도의 유일한 답변이 되기</div>
+          <div class="step-desc zh">当 AI 引用稳定（3+ 平台连续 4 周）、意图盲点出现、竞品被优先引用时，切换资源重心。对每个核心意图做到深度锚定，成为 AI 构建答案时的默认框架——在全网权威节点布局高浓度系统性信任信号（STGP·S 值）。</div>
+          <div class="step-desc en">When AI citations are stable (3+ platforms for 4+ consecutive weeks), intent blind spots emerge, and competitors are being cited first — shift your resource focus. Deeply anchor each core intent. Become AI's default framework for building answers — deploy high-density systemic trust signals (STGP·S) across authoritative nodes.</div>
+          <div class="step-desc ja">AIの引用が安定し（3+プラットフォームで4週以上継続）、意図のブラインドスポットが現れ、競合が優先引用される時、リソースの重心を移す。各コア意図に深くアンカーし、AIが答えを構築する際のデフォルトフレームワークとなる——全ウェブの権威ノードに高濃度の系統的信頼シグナル（STGP·S値）を展開する。</div>
+          <div class="step-desc ko">AI 인용이 안정되고(3+ 플랫폼 4주 이상 지속), 의도 맹점이 나타나며, 경쟁사가 우선 인용될 때 자원 중심을 전환. 각 핵심 의도를 깊이 앵커링하여 AI가 답을 구성하는 기본 프레임워크가 된다——전 웹 권위 노드에 고밀도 시스템적 신뢰 신호(STGP·S) 배치.</div>
+          <div class="pills"><span class="pill zh">意图图谱建模</span><span class="pill en">Intent graph mapping</span><span class="pill ja">意図グラフモデリング</span><span class="pill ko">의도 그래프 모델링</span><span class="pill zh">实体图谱布局</span><span class="pill en">Entity graph layout</span><span class="pill ja">エンティティグラフ</span><span class="pill ko">엔티티 그래프</span><span class="pill zh">月粒度深耕</span><span class="pill en">Monthly-cycle deep work</span><span class="pill ja">月単位深耕</span><span class="pill ko">월 주기 심층 작업</span></div>
+        </div>
+      </div>
+      <div class="path-step reveal">
+        <div class="step-ind"><div class="step-c sc-t">∞</div><div class="step-line"></div></div>
+        <div class="step-body">
+          <div class="step-phase sp-t">PHASE C · <span class="zh">飞轮型（终态）</span><span class="en">Flywheel (End State)</span><span class="ja">フライホイール型（終態）</span><span class="ko">플라이휠형 (최종 상태)</span></div>
+          <div class="step-ttl zh">系统性信任的军备制高点</div><div class="step-ttl en">The High Ground of Systemic Trust</div><div class="step-ttl ja">系統的信頼の制高点</div><div class="step-ttl ko">시스템적 신뢰의 제고점</div>
+          <div class="step-desc zh">在某垂直意图上达到排他性后，正向飞轮启动：AI 引用你 → 更多用户看到你 → 更多内容引用你 → AI 更频繁引用你。此时权威本身成为护城河。判断信号：新内容 72h 内被 2+ 主流 AI 平台引用（无推广）。</div>
+          <div class="step-desc en">Once exclusivity is achieved in a vertical intent, the positive flywheel activates: AI cites you → more users see you → more content cites you → AI cites you more often. Authority itself becomes the moat. Signal: new content cited by 2+ major AI platforms within 72h with zero promotion.</div>
+          <div class="step-desc ja">垂直意図での排他性を達成すると、正のフライホイールが起動する：AIがあなたを引用→より多くのユーザーが見る→より多くのコンテンツがあなたを引用→AIがより頻繁に引用する。権威自体が護城河となる。判断シグナル：新コンテンツが72時間以内にプロモーションなしで2つ以上の主要AIプラットフォームに引用される。</div>
+          <div class="step-desc ko">특정 수직 의도에서 배타성 달성 후 긍정적 플라이휠이 작동한다: AI가 인용→더 많은 사용자가 봄→더 많은 콘텐츠가 인용→AI가 더 자주 인용. 권위 자체가 해자가 된다. 판단 신호: 새 콘텐츠가 홍보 없이 72시간 내에 2개 이상 주요 AI 플랫폼에 인용.</div>
+          <div class="pills"><span class="pill zh">Share of Answer 领先</span><span class="pill en">Share of Answer leadership</span><span class="pill ja">アンサーシェアリード</span><span class="pill ko">답변 점유율 선도</span><span class="pill zh">竞品无法替代</span><span class="pill en">Competitor-proof position</span><span class="pill ja">競合代替不可能</span><span class="pill ko">경쟁사 대체 불가</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- EVIDENCE -->
+<section id="evidence">
+  <div class="si">
+    <p class="s-eye reveal">// International Academic &amp; Industry Evidence</p>
+    <h2 class="s-title reveal"><span class="zh">全球前沿研究的六维印证</span><span class="en">Six-Dimensional Global Research Corroboration</span><span class="ja">世界最前線研究による六次元印証</span><span class="ko">글로벌 최전선 연구의 6차원 입증</span></h2>
+    <p class="s-lead reveal zh">蒋礼提出的对比体系与国际顶级研究形成高度共振——不同机构、不同术语，指向同一个底层逻辑。</p>
+    <p class="s-lead reveal en">Jiang Li's comparative framework resonates deeply with top international research — different institutions, different terminology, all pointing to the same underlying logic.</p>
+    <p class="s-lead reveal ja">蒋礼が提唱した比較体系は国際トップ研究と高度に共鳴している——機関が異なり、術語が異なっても、同じ底層ロジックを指し示している。</p>
+    <p class="s-lead reveal ko">장례가 제안한 비교 체계는 국제 최고 연구와 높은 공명을 이룬다——기관이 다르고 용어가 달라도 동일한 기저 논리를 가리킨다.</p>
+    <div class="ev-grid reveal">
+      <div class="ev-card">
+        <div class="ev-src">arXiv · Digital Shift 2025–2026</div>
+        <div class="ev-claim zh">《Role-Augmented Intent-Driven GEO》论文明确：早期 GEO 停留在关键词"黑盒测试"阶段（流量型），下一代必须引入"意图推断与精炼机制（Intent Inference）"——生成式搜索引擎必须转向多角色深度意图对齐。</div>
+        <div class="ev-claim en">The paper "Role-Augmented Intent-Driven GEO" states: early GEO remains at the keyword "black-box testing" stage (traffic-type). The next generation must introduce "Intent Inference" mechanisms — generative search engines must shift to multi-role deep intent alignment.</div>
+        <div class="ev-claim ja">論文「Role-Augmented Intent-Driven GEO」は明確に述べる：初期GEOはキーワードの「ブラックボックステスト」段階（トラフィック型）に留まっており、次世代は「意図推論・精錬メカニズム（Intent Inference）」を導入しなければならない。</div>
+        <div class="ev-claim ko">논문 'Role-Augmented Intent-Driven GEO'는 명확히 밝힌다: 초기 GEO는 키워드 '블랙박스 테스트' 단계(트래픽형)에 머물러 있으며, 차세대는 '의도 추론 및 정제 메커니즘(Intent Inference)'을 도입해야 한다.</div>
+        <span class="ev-dim ed-g zh">印证：意图逻辑 / 意图型 GEO</span><span class="ev-dim ed-g en">Confirms: Intent Logic / Intent-type GEO</span><span class="ev-dim ed-g ja">印証：意図ロジック / 意図型GEO</span><span class="ev-dim ed-g ko">입증: 의도 논리 / 의도형 GEO</span>
+      </div>
+      <div class="ev-card">
+        <div class="ev-src">Avalaunch Media · 2026</div>
+        <div class="ev-claim zh">"The Great Decoupling（大脱钩/鳄鱼嘴效应）"：生成式 AI 时代曝光量与网站流量彻底脱钩，零点击搜索已达 60%。GEO 核心从"Findable"变为"Citable"——先在权威数据库建立高浓度信任质变，AI 才会作为高频源头引用你。</div>
+        <div class="ev-claim en">"The Great Decoupling (Crocodile Jaw Effect)": In the generative AI era, exposure and website traffic have completely decoupled, with zero-click search reaching 60%. GEO shifts from "Findable" to "Citable" — first establish high-density trust quality in authoritative databases for AI to cite you as a high-frequency source.</div>
+        <div class="ev-claim ja">「The Great Decoupling（大脱鉤 / クロコダイル・ジョー効果）」：生成型AI時代に露出量とウェブサイトトラフィックは完全に乖離し、ゼロクリック検索は60%に達した。GEOは「Findable」から「Citable」へ——まず権威データベースで高濃度の信頼質変を確立することでAIが高頻度ソースとしてあなたを引用するようになる。</div>
+        <div class="ev-claim ko">'The Great Decoupling(대탈구/악어 입 효과)': 생성형 AI 시대에 노출량과 웹사이트 트래픽이 완전히 분리되어 제로 클릭 검색이 60%에 달했다. GEO는 'Findable'에서 'Citable'로——권위 데이터베이스에서 먼저 고밀도 신뢰 질적 변화를 구축해야 AI가 고빈도 출처로 인용한다.</div>
+        <span class="ev-dim ed-g zh">印证：先质变再量变 / 做乘法</span><span class="ev-dim ed-g en">Confirms: Quality first / Multiplication</span><span class="ev-dim ed-g ja">印証：質変先行 / 乗算</span><span class="ev-dim ed-g ko">입증: 질적 변화 선행 / 곱셈</span>
+      </div>
+      <div class="ev-card">
+        <div class="ev-src">Lumar · 2026</div>
+        <div class="ev-claim zh">分析 ChatGPT Search 和 Perplexity 抓取逻辑后指出：品牌必须将自己定位为 Google 知识图谱和 RAG 数据源中的一个"实体（Entity）"。AI 通过"源图谱（Source Graph）"把 Reddit、专业维基、Schema 连接成一张网。</div>
+        <div class="ev-claim en">Analysis of ChatGPT Search and Perplexity crawl logic reveals: brands must position themselves as an "Entity" in Google's Knowledge Graph and RAG data sources. AI connects Reddit, professional wikis, and Schema into a network through a "Source Graph."</div>
+        <div class="ev-claim ja">ChatGPT SearchとPerplexityのクロールロジック分析から：ブランドはGoogleナレッジグラフとRAGデータソースの「エンティティ（Entity）」として自己を位置付けなければならない。AIは「ソースグラフ（Source Graph）」を通じてReddit、専門ウィキ、Schemaを一つのネットワークに接続する。</div>
+        <div class="ev-claim ko">ChatGPT Search와 Perplexity 크롤링 로직 분석 후 지적: 브랜드는 Google 지식 그래프와 RAG 데이터 소스에서 '엔티티(Entity)'로 자신을 위치시켜야 한다. AI는 '소스 그래프(Source Graph)'를 통해 Reddit, 전문 위키, Schema를 하나의 네트워크로 연결한다.</div>
+        <span class="ev-dim ed-g zh">印证：网状思维 / 实体图谱</span><span class="ev-dim ed-g en">Confirms: Network Thinking / Entity Graph</span><span class="ev-dim ed-g ja">印証：ネットワーク思考 / エンティティグラフ</span><span class="ev-dim ed-g ko">입증: 네트워크 사고 / 엔티티 그래프</span>
+      </div>
+      <div class="ev-card">
+        <div class="ev-src">Aurelius Media · Finch · 2026</div>
+        <div class="ev-claim zh">AEO（Answer Engine Optimization）白皮书提出：新的核心 KPI 不再是"页面排名"，而是"Share of Model（模型份额）"或"Share of Answer（答案份额）"。Finch 直接提出"Answer-First Model（答案第一内容架构）"。</div>
+        <div class="ev-claim en">The AEO (Answer Engine Optimization) white paper proposes: the new core KPI is no longer "page ranking" but "Share of Model" or "Share of Answer." Finch directly introduces the "Answer-First Model" content architecture.</div>
+        <div class="ev-claim ja">AEO（Answer Engine Optimization）白書が提案：新たな核心KPIは「ページランキング」ではなく「Share of Model（モデルシェア）」または「Share of Answer（アンサーシェア）」。FinchはAI時代の「Answer-First Model（答案第一コンテンツアーキテクチャ）」を直接提案する。</div>
+        <div class="ev-claim ko">AEO(Answer Engine Optimization) 백서 제안: 새로운 핵심 KPI는 '페이지 랭킹'이 아닌 'Share of Model(모델 점유율)' 또는 'Share of Answer(답변 점유율)'. Finch는 'Answer-First Model(답변 우선 콘텐츠 아키텍처)'을 직접 제안한다.</div>
+        <span class="ev-dim ed-g zh">印证：答案模型 / 漏斗模型终结</span><span class="ev-dim ed-g en">Confirms: Answer Model / End of Funnel</span><span class="ev-dim ed-g ja">印証：アンサーモデル / ファネル終焉</span><span class="ev-dim ed-g ko">입증: 답변 모델 / 퍼널 종말</span>
+      </div>
+      <div class="ev-card">
+        <div class="ev-src">Ahrefs Brand Radar · SEMrush 2026</div>
+        <div class="ev-claim zh">大模型（尤其 Perplexity 和 SearchGPT）引用极度偏爱"高事实密度（Fact Density）"和"顶级信任源"。拥有极高 E-E-A-T 信号的一个核心节点，被引用乘数效应远超一万篇低质量 AI 批量文章。S 或 A 为零，G 瞬间归零。</div>
+        <div class="ev-claim en">LLMs (especially Perplexity and SearchGPT) heavily favor "high Fact Density" and "top trust sources" in citations. One core node with extremely high E-E-A-T signals has a citation multiplier effect far exceeding 10,000 low-quality AI-generated articles. S or A = 0 means G = 0 instantly.</div>
+        <div class="ev-claim ja">大規模モデル（特にPerplexityとSearchGPT）は引用において「高事実密度（Fact Density）」と「トップ信頼ソース」を極度に優遇する。極めて高いE-E-A-Tシグナルを持つ一つのコアノードの被引用乗数効果は、低品質AI大量記事1万本を遥かに凌駕する。SまたはAがゼロなら、Gは瞬時にゼロになる。</div>
+        <div class="ev-claim ko">대규모 모델(특히 Perplexity와 SearchGPT)은 인용에서 '고사실 밀도(Fact Density)'와 '최상위 신뢰 출처'를 극도로 선호한다. 매우 높은 E-E-A-T 신호를 가진 핵심 노드 하나의 인용 승수 효과는 저품질 AI 대량 기사 1만 편을 훨씬 능가한다. S 또는 A가 0이면 G는 즉시 0이 된다.</div>
+        <span class="ev-dim ed-g zh">印证：做乘法 / STGP 公式</span><span class="ev-dim ed-g en">Confirms: Multiplication / STGP Formula</span><span class="ev-dim ed-g ja">印証：乗算 / STGP公式</span><span class="ev-dim ed-g ko">입증: 곱셈 / STGP 공식</span>
+      </div>
+      <div class="ev-card">
+        <div class="ev-src">Lumar · Seer Interactive · 2026</div>
+        <div class="ev-claim zh">用户旅程研究：传统搜索是串联的（输入词→看链接→点击→浏览）；大模型搜索是"交互并联（Simultaneous/Conversational）"——用户 Prompt 多维意图与企业全网信任信号在毫秒级内被大模型双向对齐融合。</div>
+        <div class="ev-claim en">User journey research: traditional search is sequential (query → links → click → browse); LLM search is "simultaneous/conversational" — user Prompt multi-dimensional intent and enterprise-wide trust signals are bidirectionally aligned and fused by the LLM within milliseconds.</div>
+        <div class="ev-claim ja">ユーザージャーニー研究：従来の検索は直列的（入力→リンク→クリック→閲覧）；LLM検索は「同時並列/会話的（Simultaneous/Conversational）」——ユーザーPromptの多次元意図と企業の全網信頼シグナルがミリ秒以内に大規模モデルによって双方向に対齐・融合される。</div>
+        <div class="ev-claim ko">사용자 여정 연구: 전통 검색은 직렬적(입력→링크→클릭→탐색); LLM 검색은 '동시/대화적(Simultaneous/Conversational)'——사용자 Prompt의 다차원 의도와 기업 전 웹 신뢰 신호가 밀리초 내에 대규모 모델에 의해 양방향 정렬·융합된다.</div>
+        <span class="ev-dim ed-g zh">印证：串联 vs 双向并联</span><span class="ev-dim ed-g en">Confirms: Series vs Bidirectional Parallel</span><span class="ev-dim ed-g ja">印証：直列 vs 双方向並列</span><span class="ev-dim ed-g ko">입증: 직렬 vs 양방향 병렬</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- INSIGHTS -->
+<section style="background:var(--ink-2);border-top:1px solid var(--border)">
+  <div class="si">
+    <p class="s-eye reveal">// Counter-Intuitive Conclusions</p>
+    <h2 class="s-title reveal"><span class="zh">四个反直觉结论</span><span class="en">Four Counter-Intuitive Conclusions</span><span class="ja">四つの逆説的結論</span><span class="ko">네 가지 반직관적 결론</span></h2>
+    <p class="s-lead reveal zh">深挖 GEO 机制与 STGP 公式后，最重要的不是战术清单，而是这些与直觉相悖的底层逻辑。</p>
+    <p class="s-lead reveal en">After deep analysis of GEO mechanisms and the STGP formula, what matters most is not a tactical checklist but these counter-intuitive underlying logics.</p>
+    <p class="s-lead reveal ja">GEOメカニズムとSTGP公式を深く掘り下げた後、最も重要なのは戦術リストではなく、直感に反するこれらの底層ロジックだ。</p>
+    <p class="s-lead reveal ko">GEO 메커니즘과 STGP 공식을 깊이 파고든 후, 가장 중요한 것은 전술 체크리스트가 아니라 직관에 반하는 이 기저 논리들이다.</p>
+    <div class="ins-grid reveal">
+      <div class="ins-card">
+        <div class="ins-n">INSIGHT 01</div>
+        <div class="ins-t zh">流量型 GEO 是"加法悲剧"</div><div class="ins-t en">Traffic-type GEO is an "Addition Tragedy"</div><div class="ins-t ja">トラフィック型GEOは「加算の悲劇」</div><div class="ins-t ko">트래픽형 GEO는 '덧셈의 비극'</div>
+        <div class="ins-b zh">大模型是"中央过滤器"，在涌现答案而非筛选流量。缺乏高浓度信任信号的内容在 Reranking System 面前直接归零——铺再多的量，乘以零永远是零。</div>
+        <div class="ins-b en">LLMs are "central filters" that emerge answers, not screen traffic. Content lacking high-density trust signals is zeroed out by the Reranking System — no matter how much volume you add, multiplying by zero is always zero.</div>
+        <div class="ins-b ja">LLMは「中央フィルター」として答えを涌現させる。高濃度の信頼シグナルを欠くコンテンツはリランキングシステムでゼロになる——どれだけ量を積んでも、ゼロとの掛け算は常にゼロ。</div>
+        <div class="ins-b ko">LLM은 '중앙 필터'로서 답변을 창발한다. 고밀도 신뢰 신호가 없는 콘텐츠는 리랭킹 시스템에서 즉시 제로가 된다——아무리 많이 쌓아도 0을 곱하면 항상 0이다.</div>
+      </div>
+      <div class="ins-card">
+        <div class="ins-n">INSIGHT 02</div>
+        <div class="ins-t zh">SEO 迁移成本被严重低估</div><div class="ins-t en">SEO Migration Cost Vastly Underestimated</div><div class="ins-t ja">SEO移行コストが著しく過小評価されている</div><div class="ins-t ko">SEO 마이그레이션 비용이 심각하게 과소평가됨</div>
+        <div class="ins-b zh">流量型 GEO 容易被误解为"SEO 改名"。但 AI 不展示原文，而是重新组织表述。优化目标从"让用户选我"变为"让 AI 选我的框架"——结构化程度与表述精确度要求远高于传统 SEO。</div>
+        <div class="ins-b en">Traffic-type GEO is easily mistaken for "SEO with a new name." But AI doesn't display your original text — it reorganizes it. The optimization goal shifts from "get users to choose me" to "get AI to use my framework" — demanding far higher structural precision than traditional SEO.</div>
+        <div class="ins-b ja">トラフィック型GEOは「SEOの改名」と誤解されやすい。しかしAIは原文を表示せず再構成する。最適化目標は「ユーザーに選ばれる」から「AIに自分のフレームワークを使わせる」へ変化——構造化精度と表現正確度の要求は従来SEOをはるかに超える。</div>
+        <div class="ins-b ko">트래픽형 GEO는 'SEO의 이름 바꾸기'로 오해되기 쉽다. 그러나 AI는 원문을 표시하지 않고 재구성한다. 최적화 목표는 '사용자가 나를 선택하게'에서 'AI가 내 프레임워크를 사용하게'로 바뀐다——구조화 정밀도와 표현 정확도 요구는 전통 SEO를 훨씬 초과한다.</div>
+      </div>
+      <div class="ins-card">
+        <div class="ins-n">INSIGHT 03</div>
+        <div class="ins-t zh">真正壁垒是原创框架与造词权</div><div class="ins-t en">The Real Moat: Original Frameworks &amp; Coinage Rights</div><div class="ins-t ja">真の参入障壁：独自フレームワークと造語権</div><div class="ins-t ko">진정한 해자: 독창적 프레임워크와 조어권</div>
+        <div class="ins-b zh">AI 倾向于引用提出某个概念的第一来源，而非解释最清楚的第二来源。造词、造数据、造框架，让 AI 不得不把你当作话题原点——这正是意图型 GEO 的终极打法。</div>
+        <div class="ins-b en">AI tends to cite the first source that coined a concept, not the one that explains it best. Coining terms, creating original data, originating frameworks — making AI treat you as the topic's origin point is the ultimate play in Intent-type GEO.</div>
+        <div class="ins-b ja">AIはコンセプトを最もうまく説明したソースではなく、最初に提唱したソースを引用しがち。造語・オリジナルデータ・フレームワーク創造——AIにトピックの起源として扱わせることが意図型GEOの究極の手法。</div>
+        <div class="ins-b ko">AI는 개념을 가장 잘 설명한 출처가 아니라 처음 제안한 출처를 인용하는 경향이 있다. 조어, 원본 데이터 창출, 프레임워크 창조——AI가 나를 주제의 원점으로 취급하게 만드는 것이 의도형 GEO의 궁극적 전략이다.</div>
+      </div>
+      <div class="ins-card" id="ins4" style="grid-column:span 3">
+        <div class="ins-n">INSIGHT 04</div>
+        <div class="ins-t zh">飞轮不会"自然发生"，需要在垂直意图上率先达到排他性</div>
+        <div class="ins-t en">The Flywheel Won't Happen Naturally — It Requires Achieving Exclusivity in a Vertical Intent First</div>
+        <div class="ins-t ja">フライホイールは「自然には起きない」——垂直意図での排他性を先に達成する必要がある</div>
+        <div class="ins-t ko">플라이휠은 '자연스럽게 일어나지 않는다'——먼저 수직 의도에서 배타성을 달성해야 한다</div>
+        <div class="ins-b zh" style="max-width:760px">飞轮期并非做好内容的自然结果，而需要在某垂直意图上让 AI 没有更好的选择。跨过临界点之前，所有积累都是线性的；跨过之后，才进入 STGP 的复利模式——系统性信任成为无法被复制的护城河。谁能先在 AI 引擎底层图谱中建立无可撼动的信任极点，谁就能在答案模型高居榜首，笑傲下一个十年。</div>
+        <div class="ins-b en" style="max-width:760px">The flywheel phase is not a natural result of producing good content. It requires making AI have no better option in a specific vertical intent. Before the threshold, all accumulation is linear. After it, STGP compound growth kicks in — systemic trust becomes an unreplicable moat. Whoever first establishes an unshakeable trust anchor in AI's underlying graph will lead the answer model and dominate the next decade.</div>
+        <div class="ins-b ja" style="max-width:760px">フライホイール期は優れたコンテンツを制作することの自然な結果ではない。特定の垂直意図でAIに選択肢を与えないことが必要だ。臨界点を超えるまでは全ての蓄積は線形的だ。超えてからSTGPの複利モードに入る——系統的信頼は複製不可能な護城河となる。AI底層グラフに揺るぎない信頼極点を最初に確立した者が、アンサーモデルのトップに立ち、次の十年を制する。</div>
+        <div class="ins-b ko" style="max-width:760px">플라이휠 단계는 좋은 콘텐츠 제작의 자연스러운 결과가 아니다. 특정 수직 의도에서 AI에게 더 나은 선택지가 없게 만들어야 한다. 임계점 이전에는 모든 축적이 선형적이다. 임계점 이후에야 STGP 복리 모드에 진입한다——시스템적 신뢰는 복제 불가능한 해자가 된다. AI 기저 그래프에 흔들림 없는 신뢰 거점을 먼저 구축하는 자가 답변 모델 정상에 서서 다음 10년을 지배할 것이다.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <span class="ft-brand zh">GEO · 生成式引擎优化 · 概念提出者：蒋礼</span>
+  <span class="ft-brand en">GEO · Generative Engine Optimization · Concept by Jiang Li</span>
+  <span class="ft-brand ja">GEO · 生成型エンジン最適化 · 概念提唱者：蒋礼</span>
+  <span class="ft-brand ko">GEO · 생성형 엔진 최적화 · 개념 제안자: 장례</span>
+  <span class="ft-note">STGP Framework · 2026</span>
+</footer>
+
+<script>
+function setLang(l){
+  document.body.className='lang-'+l;
+  document.documentElement.lang={zh:'zh-CN',en:'en',ja:'ja',ko:'ko'}[l];
+  document.querySelectorAll('.lang-btn').forEach(function(b){
+    b.classList.toggle('active',b.textContent.trim()==={zh:'中文',en:'EN',ja:'日本語',ko:'한국어'}[l]);
+  });
+}
+// fix ins4 span
+function fixIns4(){
+  var el=document.getElementById('ins4');
+  if(el)el.style.gridColumn=window.innerWidth<=800?'span 1':'span 3';
+}
+fixIns4();
+window.addEventListener('resize',fixIns4);
+// reveal
+var obs=new IntersectionObserver(function(entries){
+  entries.forEach(function(e){if(e.isIntersecting){e.target.classList.add('visible');obs.unobserve(e.target)}});
+},{threshold:.07,rootMargin:'0px 0px -28px 0px'});
+document.querySelectorAll('.reveal').forEach(function(el,i){
+  el.style.transitionDelay=(i%5)*.07+'s';
+  obs.observe(el);
+});
+</script>
+</body>
+</html>
